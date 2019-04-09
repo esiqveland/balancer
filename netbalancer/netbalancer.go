@@ -75,7 +75,7 @@ func (b *dnsBalancer) update() {
 			nextHostList, err := lookupTimeout(b.Timeout, b.lookupAddress, b.port)
 			if err != nil {
 				//  TODO: set hostList to empty?
-				//  TODO: log?
+				log.Printf("[SrvBalancer] error looking up dns='%v': %v", b.lookupAddress, err)
 			} else {
 				if nextHostList != nil {
 					log.Printf("[DnsBalancer] reloaded dns=%v hosts=%v", b.lookupAddress, nextHostList)

@@ -115,7 +115,7 @@ func (b *dnsSrvBalancer) update() {
 			nextHostList, err := lookupSRVTimeout(b.Timeout, b.serviceName, b.proto, b.host)
 			if err != nil {
 				//  TODO: set hostList to empty?
-				//  TODO: log?
+				log.Printf("[SRVBalancer] error looking up dns='%v': %v", b.host, err)
 			} else {
 				if nextHostList != nil {
 					log.Printf("[SRVBalancer] reloaded dns=%v hosts=%v", b.host, nextHostList)
