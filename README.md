@@ -21,7 +21,8 @@ This library does not retry or otherwise try to fix problems, leaving this up to
 - [ ] Decide on a few error scenarios:
   - [X] `netbalancer`: implement a timeout?
   - [X] `netbalancer`: DNS lookup returned 0 hosts
-  - [ ] `netbalancer`: DNS lookup returned error
+  - [X] `netbalancer`: DNS lookup returned error. We just log the error, effectively ignoring it
+    - [ ] on error, return lookup error?
 
 ## Known limitations
 
