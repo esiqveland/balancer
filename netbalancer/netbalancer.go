@@ -16,8 +16,11 @@ import (
 // We can not use TTL from dns because TTL is not exposed by the Go calls.
 func New(host string, port int, updateInterval, timeout time.Duration) (balancer.Balancer, error) {
 	initialHosts, err := lookupTimeout(timeout, host, port)
+	if err != nil {
+		return nil, err
+	}
 	if len(initialHosts) == 0 {
-		return nil, errors.Wrapf(err, "Error no ips found for host=%v", host)
+		return nil, balancer.ErrNoHosts
 	}
 
 	bal := &dnsBalancer{
@@ -74,7 +77,7 @@ func (b *dnsBalancer) update() {
 				//  TODO: set hostList to empty?
 				//  TODO: log?
 			} else {
-				if len(nextHostList) > 0 {
+				if nextHostList != nil {
 					log.Printf("[DnsBalancer] reloaded dns=%v hosts=%v", b.lookupAddress, nextHostList)
 					b.lock.Lock()
 					b.hosts = nextHostList
@@ -97,16 +100,13 @@ func lookupTimeout(timeout time.Duration, host string, port int) ([]balancer.Hos
 }
 
 func lookup(ctx context.Context, host string, port int) ([]balancer.Host, error) {
+	hosts := []balancer.Host{}
+
 	ips, err := net.DefaultResolver.LookupIPAddr(ctx, host)
 	if err != nil {
-		return nil, errors.Wrapf(err, "Error looking up initial list for host=%v", host)
+		return hosts, errors.Wrapf(err, "Error looking up host=%v", host)
 	}
 
-	if len(ips) == 0 {
-		return nil, balancer.ErrNoHosts
-	}
-
-	hosts := []balancer.Host{}
 	for k := range ips {
 		entry := balancer.Host{
 			Address: ips[k].IP,

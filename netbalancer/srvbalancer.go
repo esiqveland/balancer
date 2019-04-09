@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/esiqveland/balancer"
-	"github.com/pkg/errors"
 )
 
 type dnsSrvBalancer struct {
@@ -24,16 +23,15 @@ type dnsSrvBalancer struct {
 	Timeout     time.Duration
 }
 
-// NewNetBalancer returns a Balancer that uses dns lookups from net.Lookup* to reload a set of hosts every updateInterval.
-// We can not use TTL from dns because TTL is not exposed by the Go calls.
+// NewSRV returns a Balancer that uses dns lookups from net.LookupSRV to reload a set of hosts every updateInterval.
+// We can not use TTL from dns because TTL is not exposed by the Go stdlib.
 func NewSRV(servicename, proto, host string, updateInterval time.Duration, dnsTimeout time.Duration) (balancer.Balancer, error) {
 	initialHosts, err := lookupSRVTimeout(dnsTimeout, servicename, proto, host)
 	if err != nil {
 		return nil, err
 	}
-
 	if len(initialHosts) == 0 {
-		return nil, errors.Wrapf(err, "Error no ips found for host=%v", host)
+		return nil, balancer.ErrNoHosts
 	}
 
 	bal := &dnsSrvBalancer{
@@ -119,8 +117,8 @@ func (b *dnsSrvBalancer) update() {
 				//  TODO: set hostList to empty?
 				//  TODO: log?
 			} else {
-				if len(nextHostList) > 0 {
-					log.Printf("[DnsBalancer] reloaded dns=%v hosts=%v", b.host, nextHostList)
+				if nextHostList != nil {
+					log.Printf("[SRVBalancer] reloaded dns=%v hosts=%v", b.host, nextHostList)
 					b.lock.Lock()
 					b.hosts = nextHostList
 					b.lock.Unlock()
