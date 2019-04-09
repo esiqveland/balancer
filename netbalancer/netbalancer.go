@@ -69,8 +69,6 @@ func (b *dnsBalancer) update() {
 	for {
 		select {
 		case <-tick.C:
-			// TODO: timeout
-			// TODO: retries?
 			nextHostList, err := lookupTimeout(b.Timeout, b.lookupAddress, b.port)
 			if err != nil {
 				//  TODO: set hostList to empty?
