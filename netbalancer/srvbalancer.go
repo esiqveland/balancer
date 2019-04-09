@@ -21,6 +21,7 @@ type dnsSrvBalancer struct {
 	interval    time.Duration
 	quit        chan int
 	lock        *sync.Mutex
+	Timeout     time.Duration
 }
 
 // NewNetBalancer returns a Balancer that uses dns lookups from net.Lookup* to reload a set of hosts every updateInterval.
@@ -44,6 +45,7 @@ func NewSRV(servicename, proto, host string, updateInterval time.Duration) (bala
 		counter:     0,
 		quit:        make(chan int, 1),
 		lock:        &sync.Mutex{},
+		Timeout:     time.Second * 1,
 	}
 
 	// start update loop
@@ -52,10 +54,10 @@ func NewSRV(servicename, proto, host string, updateInterval time.Duration) (bala
 	return bal, nil
 }
 
-func lookupSRV(servicename, proto, host string) ([]balancer.Host, error) {
+func lookupSRV(ctx context.Context, servicename, proto, host string) ([]balancer.Host, error) {
 	hosts := []balancer.Host{}
 
-	_, addrs, err := net.LookupSRV(servicename, proto, host)
+	_, addrs, err := net.DefaultResolver.LookupSRV(ctx, servicename, proto, host)
 	if err != nil {
 		return hosts, err
 	}
@@ -63,7 +65,7 @@ func lookupSRV(servicename, proto, host string) ([]balancer.Host, error) {
 	var firstErr error = nil
 
 	for _, v := range addrs {
-		ips, err := net.DefaultResolver.LookupIPAddr(context.TODO(), v.Target)
+		ips, err := net.DefaultResolver.LookupIPAddr(ctx, v.Target)
 		if err != nil {
 			if firstErr == nil {
 				firstErr = err
@@ -104,9 +106,10 @@ func (b *dnsSrvBalancer) update() {
 	for {
 		select {
 		case <-tick.C:
-			// TODO: timeout
-			// TODO: retries?
-			nextHostList, err := lookupSRV(b.serviceName, b.proto, b.host)
+			ctx := context.Background()
+			ctx, cancel := context.WithTimeout(ctx, b.Timeout)
+			nextHostList, err := lookupSRV(ctx, b.serviceName, b.proto, b.host)
+			cancel()
 			if err != nil {
 				//  TODO: set hostList to empty?
 				//  TODO: log?
