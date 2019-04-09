@@ -15,6 +15,7 @@ This library does not retry or otherwise try to fix problems, leaving this up to
 
 ## TODO
 
+- [ ] Any logging?
 - [ ] Decide on a few error scenarios:
   - [X] `netbalancer`: implement a timeout?
   - [ ] `netbalancer`: DNS lookup returned 0 hosts
