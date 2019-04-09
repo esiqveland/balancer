@@ -13,7 +13,7 @@ import (
 
 // NewNetBalancer returns a Balancer that uses dns lookups from net.Lookup* to reload a set of hosts every updateInterval.
 // We can not use TTL from dns because TTL is not exposed by the Go calls.
-func NewNetBalancer(host string, port int, updateInterval time.Duration) (balancer.Balancer, error) {
+func New(host string, port int, updateInterval time.Duration) (balancer.Balancer, error) {
 	initialHosts, err := lookup(host, port)
 	if len(initialHosts) == 0 {
 		return nil, errors.Wrapf(err, "Error no ips found for host=%v", host)
