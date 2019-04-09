@@ -1,0 +1,117 @@
+package netbalancer
+
+import (
+	"log"
+	"net"
+	"sync"
+	"sync/atomic"
+	"time"
+
+	"github.com/esiqveland/balancer"
+	"github.com/pkg/errors"
+)
+
+// NewNetBalancer returns a Balancer that uses dns lookups from net.Lookup* to reload a set of hosts every updateInterval.
+// We can not use TTL from dns because TTL is not exposed by the Go calls.
+func NewNetBalancer(host string, port int, updateInterval time.Duration) (balancer.Balancer, error) {
+	initialHosts, err := lookup(host, port)
+	if len(initialHosts) == 0 {
+		return nil, errors.Wrapf(err, "Error no ips found for host=%v", host)
+	}
+
+	bal := &dnsBalancer{
+		lookupAddress: host,
+		port:          port,
+		hosts:         initialHosts,
+		interval:      updateInterval,
+		counter:       0,
+		quit:          make(chan int, 1),
+		lock:          &sync.Mutex{},
+	}
+
+	// start update loop
+	go bal.update()
+
+	return bal, nil
+}
+
+type dnsBalancer struct {
+	lookupAddress string
+	port          int
+	hosts         []balancer.Host
+	counter       uint64
+	interval      time.Duration
+	quit          chan int
+	lock          *sync.Mutex
+}
+
+func (b *dnsBalancer) Next() (balancer.Host, error) {
+	// make sure to store a reference before we start
+	hosts := b.hosts
+	count := uint64(len(hosts))
+	if count == 0 {
+		return balancer.Host{}, balancer.ErrNoHosts
+	}
+
+	nextNum := atomic.AddUint64(&b.counter, 1)
+
+	idx := nextNum % count
+
+	return hosts[idx], nil
+}
+
+func (b *dnsBalancer) update() {
+	tick := time.NewTicker(b.interval)
+
+	for {
+		select {
+		case <-tick.C:
+			// TODO: timeout
+			// TODO: retries?
+			nextHostList, err := lookup(b.lookupAddress, b.port)
+			if err != nil {
+				//  TODO: set hostList to empty?
+				//  TODO: log?
+			} else {
+				if len(nextHostList) > 0 {
+					log.Printf("[DnsBalancer] reloaded dns=%v hosts=%v", b.lookupAddress, nextHostList)
+					b.lock.Lock()
+					b.hosts = nextHostList
+					b.lock.Unlock()
+				}
+			}
+		case <-b.quit:
+			tick.Stop()
+			return
+		}
+	}
+}
+
+func lookup(host string, port int) ([]balancer.Host, error) {
+	ips, err := net.LookupIP(host)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Error looking up initial list for host=%v", host)
+	}
+
+	if len(ips) == 0 {
+		return nil, balancer.ErrNoHosts
+	}
+
+	hosts := []balancer.Host{}
+	for k := range ips {
+		entry := balancer.Host{
+			Address: ips[k],
+			Port:    port,
+		}
+		hosts = append(hosts, entry)
+	}
+
+	return hosts, nil
+}
+
+func (b *dnsBalancer) Close() error {
+	// TODO: wait for exit
+	b.quit <- 1
+
+	return nil
+}
