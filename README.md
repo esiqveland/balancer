@@ -4,6 +4,8 @@ A simple client side load balancer for go applications.
 
 `balancer` was made to provide easier access to DNS-based load balancing for go services running in kubernetes and was mainly built for http.Client.
 
+Grpc has its own DNS load balancer, use that one.
+
 ## Scope
 
 This project does not do health checking and does not monitor status of any hosts.
@@ -23,6 +25,7 @@ This library does not retry or otherwise try to fix problems, leaving this up to
   - [X] `netbalancer`: DNS lookup returned 0 hosts
   - [X] `netbalancer`: DNS lookup returned error. We just log the error, effectively ignoring it
     - [ ] on error, return lookup error?
+    - [ ] setting the hostlist to empty on error seems a bit drastic
 
 ## Known limitations
 
