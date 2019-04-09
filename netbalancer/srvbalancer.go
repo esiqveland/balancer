@@ -26,8 +26,8 @@ type dnsSrvBalancer struct {
 
 // NewNetBalancer returns a Balancer that uses dns lookups from net.Lookup* to reload a set of hosts every updateInterval.
 // We can not use TTL from dns because TTL is not exposed by the Go calls.
-func NewSRV(servicename, proto, host string, updateInterval time.Duration) (balancer.Balancer, error) {
-	initialHosts, err := lookupSRV(servicename, proto, host)
+func NewSRV(servicename, proto, host string, updateInterval time.Duration, dnsTimeout time.Duration) (balancer.Balancer, error) {
+	initialHosts, err := lookupSRVTimeout(dnsTimeout, servicename, proto, host)
 	if err != nil {
 		return nil, err
 	}
@@ -45,13 +45,21 @@ func NewSRV(servicename, proto, host string, updateInterval time.Duration) (bala
 		counter:     0,
 		quit:        make(chan int, 1),
 		lock:        &sync.Mutex{},
-		Timeout:     time.Second * 1,
+		Timeout:     dnsTimeout,
 	}
 
 	// start update loop
 	go bal.update()
 
 	return bal, nil
+}
+
+func lookupSRVTimeout(timeout time.Duration, serviceName string, proto string, host string) ([]balancer.Host, error) {
+	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	return lookupSRV(ctx, serviceName, proto, host)
 }
 
 func lookupSRV(ctx context.Context, servicename, proto, host string) ([]balancer.Host, error) {
@@ -106,10 +114,7 @@ func (b *dnsSrvBalancer) update() {
 	for {
 		select {
 		case <-tick.C:
-			ctx := context.Background()
-			ctx, cancel := context.WithTimeout(ctx, b.Timeout)
-			nextHostList, err := lookupSRV(ctx, b.serviceName, b.proto, b.host)
-			cancel()
+			nextHostList, err := lookupSRVTimeout(b.Timeout, b.serviceName, b.proto, b.host)
 			if err != nil {
 				//  TODO: set hostList to empty?
 				//  TODO: log?

@@ -1,6 +1,7 @@
 package netbalancer
 
 import (
+	"context"
 	"log"
 	"net"
 	"sync"
@@ -13,8 +14,8 @@ import (
 
 // NewNetBalancer returns a Balancer that uses dns lookups from net.Lookup* to reload a set of hosts every updateInterval.
 // We can not use TTL from dns because TTL is not exposed by the Go calls.
-func New(host string, port int, updateInterval time.Duration) (balancer.Balancer, error) {
-	initialHosts, err := lookup(host, port)
+func New(host string, port int, updateInterval, timeout time.Duration) (balancer.Balancer, error) {
+	initialHosts, err := lookupTimeout(timeout, host, port)
 	if len(initialHosts) == 0 {
 		return nil, errors.Wrapf(err, "Error no ips found for host=%v", host)
 	}
@@ -27,6 +28,7 @@ func New(host string, port int, updateInterval time.Duration) (balancer.Balancer
 		counter:       0,
 		quit:          make(chan int, 1),
 		lock:          &sync.Mutex{},
+		Timeout:       timeout,
 	}
 
 	// start update loop
@@ -43,6 +45,7 @@ type dnsBalancer struct {
 	interval      time.Duration
 	quit          chan int
 	lock          *sync.Mutex
+	Timeout       time.Duration
 }
 
 func (b *dnsBalancer) Next() (balancer.Host, error) {
@@ -68,7 +71,7 @@ func (b *dnsBalancer) update() {
 		case <-tick.C:
 			// TODO: timeout
 			// TODO: retries?
-			nextHostList, err := lookup(b.lookupAddress, b.port)
+			nextHostList, err := lookupTimeout(b.Timeout, b.lookupAddress, b.port)
 			if err != nil {
 				//  TODO: set hostList to empty?
 				//  TODO: log?
@@ -87,8 +90,16 @@ func (b *dnsBalancer) update() {
 	}
 }
 
-func lookup(host string, port int) ([]balancer.Host, error) {
-	ips, err := net.LookupIP(host)
+func lookupTimeout(timeout time.Duration, host string, port int) ([]balancer.Host, error) {
+	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	return lookup(ctx, host, port)
+}
+
+func lookup(ctx context.Context, host string, port int) ([]balancer.Host, error) {
+	ips, err := net.DefaultResolver.LookupIPAddr(ctx, host)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Error looking up initial list for host=%v", host)
 	}
@@ -100,7 +111,7 @@ func lookup(host string, port int) ([]balancer.Host, error) {
 	hosts := []balancer.Host{}
 	for k := range ips {
 		entry := balancer.Host{
-			Address: ips[k],
+			Address: ips[k].IP,
 			Port:    port,
 		}
 		hosts = append(hosts, entry)
