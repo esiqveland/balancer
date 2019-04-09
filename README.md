@@ -15,10 +15,12 @@ This library does not retry or otherwise try to fix problems, leaving this up to
 
 ## TODO
 
-- [ ] Any logging?
+- [X] Any logging?
+- [ ] Use option-func to configure net.Resolver
+- [ ] Use option-func to configure debug mode (extra logging)
 - [ ] Decide on a few error scenarios:
   - [X] `netbalancer`: implement a timeout?
-  - [ ] `netbalancer`: DNS lookup returned 0 hosts
+  - [X] `netbalancer`: DNS lookup returned 0 hosts
   - [ ] `netbalancer`: DNS lookup returned error
 
 ## Known limitations
