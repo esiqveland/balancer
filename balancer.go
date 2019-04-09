@@ -1,9 +1,8 @@
 package balancer
 
 import (
+	"errors"
 	"net"
-
-	"github.com/pkg/errors"
 )
 
 var ErrNoHosts = errors.New("No hosts available in list")
