@@ -10,7 +10,7 @@ import (
 
 // NewSRVBalancer creates a new balancer based on lookup of DNS SRV records.
 // example usage: name: "_http", proto: "_tcp", host: "backend.namespace.kube.dc.org"
-func NewSRVBalancer(name, proto, host string) (balancer.Balancer, error) {
+func New(name, proto, host string) (balancer.Balancer, error) {
 	srvName := name + "." + proto + "." + host
 
 	cfg, err := lb.DefaultConfig()
