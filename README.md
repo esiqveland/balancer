@@ -18,14 +18,14 @@ This library does not retry or otherwise try to fix problems, leaving this up to
 ## TODO
 
 - [X] Any logging?
-- [ ] Use option-func to configure net.Resolver
 - [ ] Use option-func to configure debug mode (extra logging)
 - [ ] Decide on a few error scenarios:
   - [X] `netbalancer`: implement a timeout?
   - [X] `netbalancer`: DNS lookup returned 0 hosts
   - [X] `netbalancer`: DNS lookup returned error. We just log the error, effectively ignoring it
-    - [ ] on error, return lookup error?
-    - [ ] setting the hostlist to empty on error seems a bit drastic
+    - [X] on error, return lookup error?
+    - [X] setting the hostlist to empty on error seems a bit drastic
+      - [X] on lookup error, we keep the old list and log error
 
 ## Known limitations
 
