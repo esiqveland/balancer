@@ -13,18 +13,26 @@ import (
 
 type srvOption func(*dnsSrvBalancer)
 
+type srvResolver interface {
+	LookupSRV(ctx context.Context, service, proto, name string) (cname string, addrs []*net.SRV, err error)
+	LookupIPAddr(ctx context.Context, host string) ([]net.IPAddr, error)
+}
+
+// Resolver sets the resolver
 func Resolver(r *net.Resolver) srvOption {
 	return func(d *dnsSrvBalancer) {
 		d.resolver = r
 	}
 }
 
+// UpdateInterval sets how often the dns should be queried.
 func UpdateInterval(d time.Duration) srvOption {
 	return func(dsb *dnsSrvBalancer) {
 		dsb.interval = d
 	}
 }
 
+// Timeout sets the timeout for a DNS lookup
 func Timeout(d time.Duration) srvOption {
 	return func(dsb *dnsSrvBalancer) {
 		dsb.timeout = d
@@ -33,7 +41,7 @@ func Timeout(d time.Duration) srvOption {
 
 // dnsSrvBalancer holds all the pieces for an updating SRV lookup.
 type dnsSrvBalancer struct {
-	resolver    *net.Resolver
+	resolver    srvResolver
 	timeout     time.Duration
 	serviceName string
 	proto       string
@@ -80,7 +88,7 @@ func NewSRV(servicename, proto, host string, opts ...srvOption) (balancer.Balanc
 	return bal, nil
 }
 
-func lookupSRVTimeout(timeout time.Duration, resolver *net.Resolver, serviceName string, proto string, host string) ([]balancer.Host, error) {
+func lookupSRVTimeout(timeout time.Duration, resolver srvResolver, serviceName string, proto string, host string) ([]balancer.Host, error) {
 	ctx := context.Background()
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -88,7 +96,7 @@ func lookupSRVTimeout(timeout time.Duration, resolver *net.Resolver, serviceName
 	return lookupSRV(ctx, resolver, serviceName, proto, host)
 }
 
-func lookupSRV(ctx context.Context, resolver *net.Resolver, servicename, proto, host string) ([]balancer.Host, error) {
+func lookupSRV(ctx context.Context, resolver srvResolver, servicename, proto, host string) ([]balancer.Host, error) {
 	hosts := []balancer.Host{}
 
 	_, addrs, err := resolver.LookupSRV(ctx, servicename, proto, host)
