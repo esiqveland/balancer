@@ -46,7 +46,7 @@ type dnsSrvBalancer struct {
 	serviceName string
 	proto       string
 	host        string
-	hosts       []balancer.Host
+	hosts       []*balancer.Host
 	counter     uint64
 	interval    time.Duration
 	quit        chan int
@@ -88,7 +88,7 @@ func NewSRV(servicename, proto, host string, opts ...srvOption) (balancer.Balanc
 	return bal, nil
 }
 
-func lookupSRVTimeout(timeout time.Duration, resolver srvResolver, serviceName string, proto string, host string) ([]balancer.Host, error) {
+func lookupSRVTimeout(timeout time.Duration, resolver srvResolver, serviceName string, proto string, host string) ([]*balancer.Host, error) {
 	ctx := context.Background()
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -96,8 +96,8 @@ func lookupSRVTimeout(timeout time.Duration, resolver srvResolver, serviceName s
 	return lookupSRV(ctx, resolver, serviceName, proto, host)
 }
 
-func lookupSRV(ctx context.Context, resolver srvResolver, servicename, proto, host string) ([]balancer.Host, error) {
-	hosts := []balancer.Host{}
+func lookupSRV(ctx context.Context, resolver srvResolver, servicename, proto, host string) ([]*balancer.Host, error) {
+	hosts := []*balancer.Host{}
 
 	_, addrs, err := resolver.LookupSRV(ctx, servicename, proto, host)
 	if err != nil {
@@ -116,7 +116,7 @@ func lookupSRV(ctx context.Context, resolver srvResolver, servicename, proto, ho
 		}
 
 		for e := range ips {
-			host := balancer.Host{
+			host := &balancer.Host{
 				Address: ips[e].IP,
 				Port:    int(v.Port),
 			}
@@ -139,7 +139,7 @@ func (b *dnsSrvBalancer) Next() (balancer.Host, error) {
 
 	idx := nextNum % count
 
-	return hosts[idx], nil
+	return *hosts[idx], nil
 }
 
 func (b *dnsSrvBalancer) update() error {
@@ -152,8 +152,11 @@ func (b *dnsSrvBalancer) update() error {
 		log.Printf("[SRVBalancer] error looking up dns='%v': %v", b.host, err)
 	} else {
 		if nextHostList != nil {
-			log.Printf("[SRVBalancer] reloaded dns=%v hosts=%v", b.host, nextHostList)
-			b.hosts = nextHostList
+			prev := b.hosts
+			if !equals(prev, nextHostList) {
+				log.Printf("[SRVBalancer] hosts changed dns=%v hosts=%v", b.host, nextHostList)
+				b.hosts = nextHostList
+			}
 		}
 	}
 	return err
