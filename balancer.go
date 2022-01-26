@@ -3,6 +3,7 @@ package balancer
 import (
 	"errors"
 	"net"
+	"strconv"
 )
 
 // ErrNoHosts if the lookup returned 0 hosts.
@@ -16,4 +17,8 @@ type Balancer interface {
 type Host struct {
 	Address net.IP
 	Port    int
+}
+
+func (h Host) String() string {
+	return h.Address.String() + ":" + strconv.Itoa(h.Port)
 }
